@@ -1,0 +1,10 @@
+{
+  "description": "Provides a unified interface for monitoring urban traffic with real-time vehicle data, enhancing city management and traffic analysis efficiency.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

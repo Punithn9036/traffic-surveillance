@@ -1,0 +1,200 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+@theme inline {
+  --color-bg: #080d18;
+  --color-surface: #0c1220;
+  --color-surface-elevated: #111827;
+  --color-surface-high: #192033;
+  --color-border: #1a2a40;
+  --color-border-subtle: #0f1a2e;
+  --color-blue: #3b82f6;
+  --color-blue-dim: #1d4ed8;
+  --color-cyan: #06b6d4;
+  --color-green: #22c55e;
+  --color-amber: #f59e0b;
+  --color-red: #ef4444;
+  --color-text-primary: #f0f4f8;
+  --color-text-secondary: #8899b4;
+  --color-text-muted: #4d607a;
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #080d18;
+  color: #f0f4f8;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1a2a40; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #243348; }
+
+/* Hide scrollbar until hover */
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hidden:hover {
+  scrollbar-width: thin;
+}
+
+/* Pulse animations for status indicators */
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes pulse-amber {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(600%); }
+}
+
+.animate-pulse-green { animation: pulse-green 2s ease-in-out infinite; }
+.animate-pulse-red { animation: pulse-red 1.5s ease-in-out infinite; }
+.animate-pulse-amber { animation: pulse-amber 2s ease-in-out infinite; }
+.animate-blink { animation: blink 1s step-start infinite; }
+
+/* Live badge */
+.badge-live {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+/* CV annotation boxes */
+.cv-box {
+  border: 1.5px solid rgba(59, 130, 246, 0.8);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3), inset 0 0 8px rgba(59, 130, 246, 0.05);
+}
+.cv-box-green {
+  border: 1.5px solid rgba(34, 197, 94, 0.8);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.3), inset 0 0 8px rgba(34, 197, 94, 0.05);
+}
+.cv-box-amber {
+  border: 1.5px solid rgba(245, 158, 11, 0.8);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+}
+
+/* Camera feed background gradient */
+.camera-feed {
+  background: linear-gradient(135deg, #060a14 0%, #0a1020 50%, #08102a 100%);
+  position: relative;
+  overflow: hidden;
+}
+.camera-feed::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(59, 130, 246, 0.015) 2px,
+    rgba(59, 130, 246, 0.015) 4px
+  );
+  pointer-events: none;
+}
+
+/* Glow effects */
+.glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.15); }
+.glow-green { box-shadow: 0 0 20px rgba(34, 197, 94, 0.1); }
+.glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.1); }
+
+/* KPI card gradient borders */
+.card-accent-blue { border-left: 3px solid #3b82f6; }
+.card-accent-cyan { border-left: 3px solid #06b6d4; }
+.card-accent-green { border-left: 3px solid #22c55e; }
+.card-accent-amber { border-left: 3px solid #f59e0b; }
+.card-accent-red { border-left: 3px solid #ef4444; }
+.card-accent-purple { border-left: 3px solid #a855f7; }
+
+/* Table hover */
+.table-row-hover:hover { background: rgba(59, 130, 246, 0.06); }
+
+/* Severity indicators */
+.severity-critical { background: rgba(239, 68, 68, 0.12); border-left: 3px solid #ef4444; }
+.severity-warning { background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; }
+.severity-info { background: rgba(59, 130, 246, 0.1); border-left: 3px solid #3b82f6; }
+.severity-success { background: rgba(34, 197, 94, 0.08); border-left: 3px solid #22c55e; }
+
+/* Map camera markers */
+.cam-marker {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid;
+  cursor: pointer;
+  transition: transform 0.15s;
+  position: absolute;
+}
+.cam-marker:hover { transform: scale(1.5); }
+.cam-marker.online { background: #22c55e; border-color: #4ade80; box-shadow: 0 0 8px rgba(34, 197, 94, 0.6); }
+.cam-marker.offline { background: #ef4444; border-color: #f87171; }
+.cam-marker.warning { background: #f59e0b; border-color: #fbbf24; box-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
+.cam-marker.selected { background: #3b82f6; border-color: #60a5fa; box-shadow: 0 0 12px rgba(59, 130, 246, 0.8); transform: scale(1.4); }
+
+/* Traffic level badge */
+.traffic-low { color: #4ade80; background: rgba(34, 197, 94, 0.1); }
+.traffic-moderate { color: #fbbf24; background: rgba(245, 158, 11, 0.1); }
+.traffic-high { color: #f87171; background: rgba(239, 68, 68, 0.12); }
+.traffic-clear { color: #60a5fa; background: rgba(59, 130, 246, 0.1); }
+
+/* Recharts overrides for dark theme */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: rgba(26, 42, 64, 0.8) !important;
+}
+.recharts-text { fill: #8899b4 !important; font-size: 11px !important; font-family: 'JetBrains Mono', monospace !important; }
+.recharts-legend-item-text { color: #8899b4 !important; font-size: 11px !important; }
+.recharts-tooltip-wrapper .custom-tooltip {
+  background: #111827;
+  border: 1px solid #1a2a40;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+/* Sidebar transition */
+.sidebar-transition { transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* Progress bars */
+.progress-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: #1a2a40;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
