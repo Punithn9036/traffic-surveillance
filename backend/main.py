@@ -41,14 +41,6 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
 
-    # Reset legacy tables if schema mismatch exists
-    try:
-        c.execute("DROP TABLE IF EXISTS alerts")
-        c.execute("DROP TABLE IF EXISTS vehicles")
-        c.execute("DROP TABLE IF EXISTS anpr_reads")
-    except Exception:
-        pass
-
     c.executescript("""
     CREATE TABLE IF NOT EXISTS cameras (
         id TEXT PRIMARY KEY,
@@ -163,22 +155,6 @@ def init_db():
     );
     """)
     conn.commit()
-
-    # Auto-ensure columns exist across all existing database tables
-    columns_to_ensure = {
-        "alerts": [("subject", "TEXT"), ("camera", "TEXT"), ("location", "TEXT"), ("plate", "TEXT"), ("message", "TEXT"), ("acknowledged", "INTEGER DEFAULT 0"), ("timestamp", "TEXT"), ("created_at", "TEXT")],
-        "vehicles": [("vehicle_id", "TEXT"), ("type", "TEXT"), ("plate", "TEXT"), ("confidence", "REAL"), ("track_status", "TEXT"), ("camera", "TEXT"), ("flagged", "INTEGER DEFAULT 0"), ("bbox_x", "REAL"), ("bbox_y", "REAL"), ("bbox_w", "REAL"), ("bbox_h", "REAL"), ("speed", "REAL"), ("direction", "TEXT"), ("timestamp", "TEXT"), ("created_at", "TEXT")],
-        "anpr_reads": [("plate", "TEXT"), ("confidence", "REAL"), ("camera", "TEXT"), ("flagged", "INTEGER DEFAULT 0"), ("vehicle_type", "TEXT"), ("vehicle_id", "TEXT"), ("image_b64", "TEXT"), ("timestamp", "TEXT"), ("created_at", "TEXT")],
-        "watchlist": [("plate_number", "TEXT"), ("vehicle_id", "TEXT"), ("description", "TEXT"), ("reason", "TEXT"), ("priority", "TEXT"), ("notes", "TEXT"), ("active", "INTEGER DEFAULT 1"), ("alert_count", "INTEGER DEFAULT 0"), ("last_seen", "TEXT"), ("last_camera", "TEXT"), ("created_at", "TEXT")],
-    }
-    for table, cols in columns_to_ensure.items():
-        for col, col_type in cols:
-            try:
-                c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
-            except Exception:
-                pass
-    conn.commit()
-
     _seed_initial_data(c, conn)
     conn.close()
 
