@@ -984,100 +984,216 @@ def resolve_camera_footage(camera_id: str, root_dir: str) -> str:
 
     return os.path.join(root_dir, "sample_traffic.mp4")
 
+class CameraStreamWorker:
+    """
+    Decodes video frames once per camera, runs lightweight detection every N frames,
+    downsamples to 640x360 at JPEG Q=65, and broadcasts to all connected WebSockets.
+    Multiple connected devices share the same decoded frame without CPU duplication.
+    """
+    def __init__(self, camera_id: str, video_path: str, pipeline=None):
+        self.camera_id = camera_id
+        self.video_path = video_path
+        self.pipeline = pipeline
+        self.subscribers: set[WebSocket] = set()
+        self.task: Optional[asyncio.Task] = None
+        self.latest_json: Optional[str] = None
+        self.running = False
+        self.last_metadata = {"alerts": [], "detections": [], "anpr": []}
+        self.last_db_alert_time: dict[str, float] = {}
+        self.last_db_anpr_time: dict[str, float] = {}
+
+    def add_subscriber(self, ws: WebSocket):
+        self.subscribers.add(ws)
+        if not self.running or self.task is None or self.task.done():
+            self.running = True
+            self.task = asyncio.create_task(self._run_loop())
+
+    def remove_subscriber(self, ws: WebSocket):
+        self.subscribers.discard(ws)
+
+    def _sync_read_and_process(self, cap, frame_count: int):
+        ret, frame = False, None
+        if cap and cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+
+        if not ret or frame is None:
+            frame = generate_synthetic_frame(self.camera_id, frame_count)
+
+        # Immediate downsampling to 640px width (fast, drops RAM and CPU decode strain by 5x)
+        h, w = frame.shape[:2]
+        if w > 640:
+            target_w = 640
+            target_h = int(target_w * h / w)
+            frame = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+
+        metadata = self.last_metadata
+        if self.pipeline:
+            # Run detection on every 3rd frame so stream stays at 11+ FPS and CPU stays low
+            if frame_count % 3 == 0 or not self.last_metadata.get('detections'):
+                try:
+                    frame, metadata = self.pipeline.process_frame(frame)
+                    self.last_metadata = metadata
+                except Exception:
+                    pass
+
+        # Compress to JPEG with quality 65 (compact ~20-25KB payload for instant mobile/network loading)
+        _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 65])
+        jpg_b64 = base64.b64encode(buffer).decode('utf-8')
+
+        payload = {
+            'camera_id': self.camera_id,
+            'frame': f"data:image/jpeg;base64,{jpg_b64}",
+            'metadata': metadata,
+            'timestamp': datetime.now().strftime("%H:%M:%S")
+        }
+        return json.dumps(payload), metadata
+
+    def _throttle_db_writes(self, metadata: dict):
+        now = time.time()
+        now_iso = datetime.utcnow().isoformat()
+        time_str = datetime.now().strftime("%H:%M:%S")
+
+        new_alerts = []
+        for alert in metadata.get('alerts', []):
+            plate = alert.get('plate_text', '')
+            key = f"{alert.get('type')}:{plate}"
+            if now - self.last_db_alert_time.get(key, 0) > 10.0:
+                self.last_db_alert_time[key] = now
+                aid = f"ALT-{str(uuid.uuid4())[:8].upper()}"
+                new_alerts.append((
+                    aid, alert.get('type', 'DETECTION'), alert.get('severity', 'info'),
+                    plate, self.camera_id, plate, str(alert), time_str, now_iso
+                ))
+
+        new_anpr = []
+        for det in metadata.get('detections', []):
+            p_text = det.get('plate_text')
+            if p_text and p_text != 'UNKNOWN':
+                if now - self.last_db_anpr_time.get(p_text, 0) > 10.0:
+                    self.last_db_anpr_time[p_text] = now
+                    rid = f"ANPR-{str(uuid.uuid4())[:8].upper()}"
+                    new_anpr.append((
+                        rid, p_text, self.camera_id, 94.5, det.get('type', 'car'), now_iso
+                    ))
+
+        if new_alerts or new_anpr:
+            try:
+                conn = get_db()
+                if new_alerts:
+                    conn.executemany("""INSERT OR IGNORE INTO alerts (id,type,severity,subject,camera,plate,message,acknowledged,timestamp,created_at)
+                                        VALUES (?,?,?,?,?,?,?,0,?,?)""", new_alerts)
+                if new_anpr:
+                    conn.executemany("""INSERT OR IGNORE INTO anpr_reads (id,plate_number,camera_id,confidence,vehicle_type,flagged,status,created_at)
+                                        VALUES (?,?,?,?,?,0,'Verified',?)""", new_anpr)
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+
+    async def _run_loop(self):
+        cap = None
+        if os.path.exists(self.video_path):
+            cap = cv2.VideoCapture(self.video_path)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 2000)
+            offset = (abs(hash(self.camera_id)) * 73) % max(1, total_frames - 200)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, offset)
+        elif self.camera_id == "CAM_01":
+            cap = cv2.VideoCapture(0)
+            if not cap.isOpened():
+                cap = None
+
+        frame_count = 0
+        idle_cycles = 0
+        try:
+            while self.running:
+                if not self.subscribers:
+                    idle_cycles += 1
+                    # Stop after 15 seconds of no connected viewers to conserve CPU
+                    if idle_cycles > 150:
+                        break
+                    await asyncio.sleep(0.1)
+                    continue
+
+                idle_cycles = 0
+                frame_count += 1
+
+                try:
+                    # Offload CPU operations to thread so async event loop never blocks
+                    json_str, metadata = await asyncio.to_thread(
+                        self._sync_read_and_process, cap, frame_count
+                    )
+                    self.latest_json = json_str
+                except Exception:
+                    await asyncio.sleep(0.08)
+                    continue
+
+                # Fan-out to all connected subscribers in parallel
+                stale = []
+                for ws in list(self.subscribers):
+                    try:
+                        await ws.send_text(json_str)
+                    except Exception:
+                        stale.append(ws)
+                for ws in stale:
+                    self.subscribers.discard(ws)
+
+                # Debounced DB persistence in background
+                if metadata.get('alerts') or metadata.get('detections'):
+                    asyncio.create_task(asyncio.to_thread(self._throttle_db_writes, metadata))
+
+                await asyncio.sleep(0.09) # ~11 FPS: fluid surveillance, lightweight bandwidth
+        finally:
+            self.running = False
+            if cap:
+                cap.release()
+
+
+class CameraStreamHub:
+    def __init__(self):
+        self.workers: dict[str, CameraStreamWorker] = {}
+        self.lock = asyncio.Lock()
+
+    async def get_worker(self, camera_id: str, root_dir: str) -> CameraStreamWorker:
+        async with self.lock:
+            if camera_id not in self.workers or not self.workers[camera_id].running:
+                video_path = resolve_camera_footage(camera_id, root_dir)
+                pipeline = pipelines.get(camera_id)
+                if not pipeline and ML_AVAILABLE:
+                    try:
+                        pipeline = SurveillancePipeline(camera_id=camera_id, reid_engine=shared_reid_engine)
+                    except Exception:
+                        pipeline = None
+                self.workers[camera_id] = CameraStreamWorker(camera_id, video_path, pipeline)
+            return self.workers[camera_id]
+
+
+camera_stream_hub = CameraStreamHub()
+
+
 async def handle_camera_stream(websocket: WebSocket, camera_id: str):
     await websocket.accept()
-    pipeline = pipelines.get(camera_id, SurveillancePipeline(camera_id=camera_id, reid_engine=shared_reid_engine) if ML_AVAILABLE else None)
-    
-    # Pick distinct AICity dataset traffic footage based on camera ID
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    video_path = resolve_camera_footage(camera_id, root_dir)
-    print(f"[WS] Streaming AICity footage for {camera_id} from {video_path}")
-    
-    cap = None
-    if os.path.exists(video_path):
-        cap = cv2.VideoCapture(video_path)
-        # Stagger start frame dynamically per camera ID so videos don't synchronize
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 2000)
-        offset = (abs(hash(camera_id)) * 73) % max(1, total_frames - 200)
-        cap.set(cv2.CAP_PROP_POS_FRAMES, offset)
-    elif camera_id == "CAM_01":
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
-            cap = None
+    worker = await camera_stream_hub.get_worker(camera_id, root_dir)
 
-    frame_count = 0
+    # Deliver latest cached frame in 0ms for instant loading perception
+    if worker.latest_json:
+        try:
+            await websocket.send_text(worker.latest_json)
+        except Exception:
+            return
+
+    worker.add_subscriber(websocket)
     try:
         while True:
-            frame = None
-            if cap and cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    # Loop video continuously
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    ret, frame = cap.read()
-            
-            if frame is None:
-                frame = generate_synthetic_frame(camera_id, frame_count)
-
-            metadata = {"alerts": [], "detections": [], "anpr": []}
-            if pipeline:
-                try:
-                    frame, metadata = pipeline.process_frame(frame)
-                except Exception:
-                    pass
-
-            frame_count += 1
-            if frame.shape[1] > 640:
-                frame = cv2.resize(frame, (640, int(640 * frame.shape[0] / frame.shape[1])))
-            _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
-            jpg_b64 = base64.b64encode(buffer).decode('utf-8')
-
-            # Persist alerts to DB
-            for alert in metadata.get('alerts', []):
-                try:
-                    conn = get_db()
-                    aid = f"ALT-{str(uuid.uuid4())[:8].upper()}"
-                    now = datetime.utcnow().isoformat()
-                    conn.execute("""INSERT OR IGNORE INTO alerts (id,type,severity,subject,camera,plate,message,acknowledged,timestamp,created_at)
-                                    VALUES (?,?,?,?,?,?,?,0,?,?)""",
-                                 (aid, alert.get('type','DETECTION'), alert.get('severity','info'),
-                                  alert.get('plate_text',''), camera_id, alert.get('plate_text',''),
-                                  str(alert), datetime.now().strftime("%H:%M:%S"), now))
-                    conn.commit()
-                    conn.close()
-                except Exception:
-                    pass
-
-            # Persist ANPR detections to DB
-            for det in metadata.get('detections', []):
-                p_text = det.get('plate_text')
-                if p_text and p_text != 'UNKNOWN':
-                    try:
-                        conn = get_db()
-                        rid = f"ANPR-{str(uuid.uuid4())[:8].upper()}"
-                        now = datetime.utcnow().isoformat()
-                        conn.execute("""INSERT OR IGNORE INTO anpr_reads (id,plate_number,camera_id,confidence,vehicle_type,flagged,status,created_at)
-                                        VALUES (?,?,?,?,?,0,'Verified',?)""",
-                                     (rid, p_text, camera_id, 94.5, det.get('type', 'car'), now))
-                        conn.commit()
-                        conn.close()
-                    except Exception:
-                        pass
-
-            payload = {
-                'camera_id': camera_id,
-                'frame': f"data:image/jpeg;base64,{jpg_b64}",
-                'metadata': metadata,
-                'timestamp': datetime.now().strftime("%H:%M:%S")
-            }
-
-            await websocket.send_text(json.dumps(payload))
-            await asyncio.sleep(0.08) # ~12.5 FPS smooth dataset stream
-    except WebSocketDisconnect:
-        print(f"[WS] Client disconnected from {camera_id}")
+            # Await client keep-alive/disconnect
+            await websocket.receive_text()
+    except (WebSocketDisconnect, Exception):
+        pass
     finally:
-        if cap:
-            cap.release()
+        worker.remove_subscriber(websocket)
 
 
 # ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ

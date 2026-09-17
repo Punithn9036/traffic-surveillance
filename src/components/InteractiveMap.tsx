@@ -69,7 +69,7 @@ export default function InteractiveMap({
   const [hasError, setHasError] = useState(false)
 
   const TILE_URLS = {
-    dark: 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+    dark: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
     satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     street: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   }
@@ -79,10 +79,12 @@ export default function InteractiveMap({
     if (!mapContainerRef.current) return
 
     // Prevent duplicate map initialization error
-    if (mapInstanceRef.current || (mapContainerRef.current as any)._leaflet_id) {
-      if ((mapContainerRef.current as any)._leaflet_id) {
-        delete (mapContainerRef.current as any)._leaflet_id
-      }
+    if ((mapContainerRef.current as any)._leaflet_id) {
+      delete (mapContainerRef.current as any)._leaflet_id
+    }
+    if (mapInstanceRef.current) {
+      try { mapInstanceRef.current.remove() } catch { /* ignore */ }
+      mapInstanceRef.current = null
     }
 
     try {
@@ -94,37 +96,25 @@ export default function InteractiveMap({
 
       const initialTileLayer = L.tileLayer(TILE_URLS.dark, {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors &copy; CartoDB',
+        attribution: '&copy; OpenStreetMap contributors &copy; Esri',
       }).addTo(map)
 
       ;(map as any)._customTileLayer = initialTileLayer
       mapInstanceRef.current = map
 
       const resizeTimer = setTimeout(() => {
-        try {
-          map.invalidateSize()
-        } catch {
-          // ignore
-        }
+        try { map.invalidateSize() } catch { /* ignore */ }
       }, 200)
 
       const handleResize = () => {
-        try {
-          map.invalidateSize()
-        } catch {
-          // ignore
-        }
+        try { map.invalidateSize() } catch { /* ignore */ }
       }
       window.addEventListener('resize', handleResize)
 
       return () => {
         clearTimeout(resizeTimer)
         window.removeEventListener('resize', handleResize)
-        try {
-          map.remove()
-        } catch {
-          // ignore
-        }
+        try { map.remove() } catch { /* ignore */ }
         mapInstanceRef.current = null
       }
     } catch (err) {
@@ -133,19 +123,22 @@ export default function InteractiveMap({
     }
   }, [])
 
-  // Switch Tile Layer Theme
+  // Switch Tile Layer Theme — remove ALL existing tile layers before adding new one
   useEffect(() => {
     const map = mapInstanceRef.current
     if (!map || hasError) return
 
     try {
-      if ((map as any)._customTileLayer) {
-        map.removeLayer((map as any)._customTileLayer)
-      }
+      // Remove every tile layer currently on the map (prevents "API KEY REQUIRED" ghost layers)
+      map.eachLayer((layer) => {
+        if (layer instanceof L.TileLayer) {
+          map.removeLayer(layer)
+        }
+      })
 
       const newTileLayer = L.tileLayer(TILE_URLS[tileLayerType], {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap',
+        attribution: '&copy; OpenStreetMap &copy; Esri',
       }).addTo(map)
 
       ;(map as any)._customTileLayer = newTileLayer
@@ -216,32 +209,102 @@ export default function InteractiveMap({
     }
   }, [cameras, selectedCameraId, hasError])
 
-  // Render Trajectory Polyline
+  // Render Trajectory Polyline along Real Roads using OSRM Routing
+  const trajectoryGroupRef = useRef<L.LayerGroup | null>(null)
+
   useEffect(() => {
     const map = mapInstanceRef.current
     if (!map || hasError) return
 
-    try {
-      if (polylineRef.current) {
-        polylineRef.current.remove()
-        polylineRef.current = null
-      }
+    // Clean up existing trajectory layer group
+    if (trajectoryGroupRef.current) {
+      trajectoryGroupRef.current.clearLayers()
+      map.removeLayer(trajectoryGroupRef.current)
+      trajectoryGroupRef.current = null
+    }
 
-      if (trajectoryPoints.length > 0) {
-        const latLngs = trajectoryPoints.map((p) => [p.lat, p.lng] as [number, number])
+    if (trajectoryPoints.length === 0) return
 
-        const polyline = L.polyline(latLngs, {
-          color: '#06b6d4',
-          weight: 4,
-          opacity: 0.9,
-          dashArray: '8, 8',
-        }).addTo(map)
+    const group = L.layerGroup().addTo(map)
+    trajectoryGroupRef.current = group
 
-        polylineRef.current = polyline
-        map.fitBounds(polyline.getBounds(), { padding: [40, 40] })
-      }
-    } catch (err) {
-      console.error('Polyline error:', err)
+    const rawCoords: [number, number][] = trajectoryPoints.map((p) => [p.lat, p.lng])
+
+    // Draw immediate initial line while OSRM road coordinates fetch
+    const fallbackPolyline = L.polyline(rawCoords, {
+      color: '#0ea5e9',
+      weight: 4,
+      opacity: 0.7,
+      dashArray: '6, 6',
+    }).addTo(group)
+
+    map.fitBounds(fallbackPolyline.getBounds(), { padding: [50, 50] })
+
+    if (rawCoords.length >= 2) {
+      // Format as lng,lat;lng,lat... for OSRM
+      const osrmQuery = rawCoords.map(([lat, lng]) => `${lng},${lat}`).join(';')
+      const url = `https://router.project-osrm.org/route/v1/driving/${osrmQuery}?overview=full&geometries=geojson`
+
+      fetch(url)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.routes && data.routes[0] && data.routes[0].geometry) {
+            const roadCoords: [number, number][] = data.routes[0].geometry.coordinates.map(
+              ([lng, lat]: [number, number]) => [lat, lng]
+            )
+
+            // Remove fallback dashed line
+            group.removeLayer(fallbackPolyline)
+
+            // 1. Outer Glow Polyline (Road Casing)
+            L.polyline(roadCoords, {
+              color: '#0284c7',
+              weight: 8,
+              opacity: 0.45,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }).addTo(group)
+
+            // 2. Main Vibrant Road Polyline
+            const mainLine = L.polyline(roadCoords, {
+              color: '#38bdf8',
+              weight: 4,
+              opacity: 0.95,
+              lineCap: 'round',
+              lineJoin: 'round',
+            }).addTo(group)
+
+            // 3. Add Waypoint / Checkpoint Markers with sequence numbers
+            trajectoryPoints.forEach((pt, idx) => {
+              const isStart = idx === 0
+              const isEnd = idx === trajectoryPoints.length - 1
+              const badgeColor = isStart ? '#22c55e' : isEnd ? '#ef4444' : '#3b82f6'
+              const label = isStart ? 'START' : isEnd ? 'END' : `WAYPOINT ${idx + 1}`
+
+              const html = `
+                <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+                  <div style="background: #0f1629; color: ${badgeColor}; border: 1.5px solid ${badgeColor}; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: 800; font-family: monospace; white-space: nowrap; box-shadow: 0 0 10px ${badgeColor}60;">
+                    ● ${label} (${pt.camera_id})
+                  </div>
+                </div>
+              `
+
+              const badgeIcon = L.divIcon({
+                html,
+                className: 'trajectory-badge-pin',
+                iconSize: [80, 24],
+                iconAnchor: [40, 12],
+              })
+
+              L.marker([pt.lat, pt.lng], { icon: badgeIcon }).addTo(group)
+            })
+
+            map.fitBounds(mainLine.getBounds(), { padding: [50, 50] })
+          }
+        })
+        .catch((err) => {
+          console.warn('OSRM Road Routing fallback active:', err)
+        })
     }
   }, [trajectoryPoints, hasError])
 

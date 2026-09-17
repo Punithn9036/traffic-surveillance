@@ -78,12 +78,15 @@ def _generate_synthetic_frame(camera_id: str, frame_num: int):
 
 
 def _frame_to_b64(frame) -> str:
-    """Encode an OpenCV frame to a base64 JPEG data-URI string."""
+    """Encode an OpenCV frame to a compact base64 JPEG data-URI string."""
     if frame is None:
         return ""
     try:
         import cv2
-        _, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+        h, w = frame.shape[:2]
+        if w > 640:
+            frame = cv2.resize(frame, (640, int(640 * h / w)), interpolation=cv2.INTER_LINEAR)
+        _, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 65])
         return "data:image/jpeg;base64," + base64.b64encode(buf).decode("utf-8")
     except Exception:
         return ""

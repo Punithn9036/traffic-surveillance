@@ -451,6 +451,7 @@ export default function Alerts() {
                       }}
                     >
                       View →
+                      View Details
                     </button>
                     {!alert.acknowledged && (
                       <button

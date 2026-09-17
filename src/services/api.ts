@@ -3,7 +3,7 @@
  * Includes seamless fallback datasets for Vercel static deployments.
  */
 
-const API_BASE = (import.meta.env.VITE_API_URL as string) || (typeof window !== 'undefined' && window.location.port !== '8000' ? `http://${window.location.hostname || 'localhost'}:8000` : '');
+const API_BASE = (import.meta.env.VITE_API_URL as string) || '';
 
 // ─────────────────────────── Mock Fallback Data ───────────────────────────
 
@@ -73,22 +73,44 @@ const MOCK_SYSTEM_HEALTH: SystemHealth = {
 };
 
 async function apiFetch<T>(path: string, options?: RequestInit, fallback?: T): Promise<T> {
-  const url = `${API_BASE}${path}`;
-  try {
-    const res = await fetch(url, {
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
-      ...options,
-    });
-    if (!res.ok) {
-      if (fallback !== undefined) return fallback;
-      const error = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new Error(error.detail || `API error ${res.status}`);
-    }
-    return res.json();
-  } catch (err) {
-    if (fallback !== undefined) return fallback;
-    throw err;
+  const envUrl = (import.meta.env.VITE_API_URL as string) || '';
+  const candidates: string[] = [];
+
+  if (envUrl) {
+    candidates.push(`${envUrl}${path}`);
   }
+
+  // 1. Direct port 8000 on current hostname (fastest, avoids sandboxed proxy bottlenecks)
+  if (typeof window !== 'undefined' && window.location.port !== '8000') {
+    const hostname = window.location.hostname || 'localhost';
+    candidates.push(`http://${hostname}:8000${path}`);
+  }
+
+  // 2. Relative path (proxied by web server or reverse proxy)
+  candidates.push(path);
+
+  // 3. Localhost explicit fallback
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    candidates.push(`http://127.0.0.1:8000${path}`);
+  }
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...options?.headers },
+        ...options,
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        return await res.json();
+      }
+    } catch {
+      // Try next candidate
+    }
+  }
+
+  if (fallback !== undefined) return fallback;
+  throw new Error(`Failed to fetch ${path}`);
 }
 
 // ─────────────────────────── Types ────────────────────────────────────────
@@ -360,7 +382,10 @@ export const updateSettings = (settings: Record<string, string | number | boolea
 export const getTrajectories = () =>
   apiFetch<{ trajectories: Trajectory[] }>('/api/trajectories', undefined, {
     trajectories: [
-      { id: 'TRJ-001', vehicle_id: 'UTX-VH-00124', plate: 'KA01AB1234', vehicle_type: 'SUV', points: [[38, 28], [52, 22], [28, 18]], cameras: ['CAM_01', 'CAM_02', 'CAM_03'], start_time: '10:20:00', end_time: '10:32:12', flagged: 1, created_at: new Date().toISOString() },
+      { id: 'TRJ-001', vehicle_id: 'UTX-VH-00124', plate: 'KA01AB1234', vehicle_type: 'SUV', points: [[12.9716, 77.5946], [12.9784, 77.6408], [12.9698, 77.7499]], cameras: ['CAM_01', 'CAM_03', 'CAM_06'], start_time: '10:20:00', end_time: '10:32:12', flagged: 1, created_at: new Date().toISOString() },
+      { id: 'TRJ-002', vehicle_id: 'UTX-VH-00125', plate: 'TN09CD5678', vehicle_type: 'Motorcycle', points: [[12.9172, 77.6228], [12.8452, 77.6602]], cameras: ['CAM_02', 'CAM_05'], start_time: '10:15:30', end_time: '10:28:45', flagged: 0, created_at: new Date().toISOString() },
+      { id: 'TRJ-003', vehicle_id: 'UTX-VH-00126', plate: 'KA19EF1122', vehicle_type: 'Bus', points: [[13.0358, 77.5970], [12.9716, 77.5946], [12.9784, 77.6408]], cameras: ['CAM_04', 'CAM_01', 'CAM_03'], start_time: '10:05:10', end_time: '10:22:00', flagged: 0, created_at: new Date().toISOString() },
+      { id: 'TRJ-004', vehicle_id: 'UTX-VH-00128', plate: 'MH12GH9900', vehicle_type: 'Truck', points: [[13.0358, 77.5970], [12.9716, 77.5946], [12.9172, 77.6228], [12.8452, 77.6602]], cameras: ['CAM_04', 'CAM_01', 'CAM_02', 'CAM_05'], start_time: '09:50:00', end_time: '10:18:30', flagged: 0, created_at: new Date().toISOString() },
     ],
   });
 
