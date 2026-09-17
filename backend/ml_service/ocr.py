@@ -12,6 +12,8 @@ class PlateOCREngine:
         self.reader = None
         if use_easyocr:
             try:
+                import ssl
+                ssl._create_default_https_context = ssl._create_unverified_context
                 import easyocr
                 # Initialize for English alphanumeric characters
                 self.reader = easyocr.Reader(['en'], gpu=False)
