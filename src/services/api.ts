@@ -382,7 +382,10 @@ export const updateSettings = (settings: Record<string, string | number | boolea
 export const getTrajectories = () =>
   apiFetch<{ trajectories: Trajectory[] }>('/api/trajectories', undefined, {
     trajectories: [
-      { id: 'TRJ-001', vehicle_id: 'UTX-VH-00124', plate: 'KA01AB1234', vehicle_type: 'SUV', points: [[38, 28], [52, 22], [28, 18]], cameras: ['CAM_01', 'CAM_02', 'CAM_03'], start_time: '10:20:00', end_time: '10:32:12', flagged: 1, created_at: new Date().toISOString() },
+      { id: 'TRJ-001', vehicle_id: 'UTX-VH-00124', plate: 'KA01AB1234', vehicle_type: 'SUV', points: [[12.9716, 77.5946], [12.9784, 77.6408], [12.9698, 77.7499]], cameras: ['CAM_01', 'CAM_03', 'CAM_06'], start_time: '10:20:00', end_time: '10:32:12', flagged: 1, created_at: new Date().toISOString() },
+      { id: 'TRJ-002', vehicle_id: 'UTX-VH-00125', plate: 'TN09CD5678', vehicle_type: 'Motorcycle', points: [[12.9172, 77.6228], [12.8452, 77.6602]], cameras: ['CAM_02', 'CAM_05'], start_time: '10:15:30', end_time: '10:28:45', flagged: 0, created_at: new Date().toISOString() },
+      { id: 'TRJ-003', vehicle_id: 'UTX-VH-00126', plate: 'KA19EF1122', vehicle_type: 'Bus', points: [[13.0358, 77.5970], [12.9716, 77.5946], [12.9784, 77.6408]], cameras: ['CAM_04', 'CAM_01', 'CAM_03'], start_time: '10:05:10', end_time: '10:22:00', flagged: 0, created_at: new Date().toISOString() },
+      { id: 'TRJ-004', vehicle_id: 'UTX-VH-00128', plate: 'MH12GH9900', vehicle_type: 'Truck', points: [[13.0358, 77.5970], [12.9716, 77.5946], [12.9172, 77.6228], [12.8452, 77.6602]], cameras: ['CAM_04', 'CAM_01', 'CAM_02', 'CAM_05'], start_time: '09:50:00', end_time: '10:18:30', flagged: 0, created_at: new Date().toISOString() },
     ],
   });
 
