@@ -121,14 +121,33 @@ async def websocket_camera_feed(websocket: WebSocket, camera_id: str):
 
     pipeline = get_pipeline(camera_id)   # None in mock mode
 
-    # Try to open a hardware webcam for CAM-001
+    # Open AICity dataset video for this camera
     cap = None
-    if ML_AVAILABLE and camera_id == "CAM-001":
+    if ML_AVAILABLE:
         try:
             import cv2
-            cap = cv2.VideoCapture(0)
-            if not cap.isOpened():
-                cap = None
+            import os
+            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            cam_digits = "".join(filter(str.isdigit, camera_id))
+            video_path = None
+            dataset_dir = os.path.join(root_dir, "data", "vehicle_reid_dataset")
+            if cam_digits:
+                c_name = f"c{int(cam_digits):03d}"
+                for sub in ["train/S01", "validation/S02", "train/S03", "train/S04", "validation/S05", "test/S06"]:
+                    candidate = os.path.join(dataset_dir, sub, c_name, "vdo.avi")
+                    if os.path.exists(candidate):
+                        video_path = candidate
+                        break
+            if not video_path:
+                default_vdo = os.path.join(dataset_dir, "train", "S01", "c001", "vdo.avi")
+                if os.path.exists(default_vdo):
+                    video_path = default_vdo
+
+            if video_path and os.path.exists(video_path):
+                cap = cv2.VideoCapture(video_path)
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 2000)
+                offset = (abs(hash(camera_id)) * 73) % max(1, total_frames - 200)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, offset)
         except Exception:
             cap = None
 
@@ -142,7 +161,8 @@ async def websocket_camera_feed(websocket: WebSocket, camera_id: str):
                     import cv2
                     ret, frame = cap.read()
                     if not ret:
-                        frame = None
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        ret, frame = cap.read()
                 except Exception:
                     frame = None
 

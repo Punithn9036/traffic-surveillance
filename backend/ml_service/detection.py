@@ -47,7 +47,7 @@ class VehicleDetector:
         detections = []
 
         if self.use_yolo and self.yolo_model is not None:
-            results = self.yolo_model(frame, verbose=False)[0]
+            results = self.yolo_model(frame, imgsz=320, conf=self.conf_thresh, verbose=False)[0]
             for box in results.boxes:
                 cls_id = int(box.cls[0])
                 conf   = float(box.conf[0])

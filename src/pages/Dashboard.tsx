@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { getTrafficStats, getAlerts, getSystemHealth, TrafficStats, Alert, SystemHealth, Camera } from '../services/api';
 import { useApp } from '../context/AppContext';
+import { useCameraFeed } from '../services/websocket';
 import InteractiveMap, { MapCamera } from '../components/InteractiveMap';
 
 type ChartFilter = '15m' | '1h' | 'today' | 'custom';
@@ -124,13 +125,130 @@ function CityMap({ cameras, onSelectCamera, selectedCam }: { cameras: Camera[]; 
   );
 }
 
-// ── Alerts Panel ─────────────────────────────────────────────────────────
+// ── Dashboard Live Camera Feed Component ──────────────────────────────────────
+function DashboardLiveFeed({
+  cameraId,
+  cameras,
+  onSelectCamera,
+  onOpenDetail,
+}: {
+  cameraId: string;
+  cameras: Camera[];
+  onSelectCamera: (id: string) => void;
+  onOpenDetail: (id: string) => void;
+}) {
+  const currentCam = cameras.find(c => c.id === cameraId) || cameras[0];
+  const activeId = currentCam?.id || cameraId || 'CAM-001';
+  const { frameUrl, connected, timestamp, metadata } = useCameraFeed(activeId, true);
+
+  const quickCams = cameras.slice(0, 6);
+
+  return (
+    <div className="bg-[#0c1220] border border-[#1a2a40] rounded-xl flex flex-col overflow-hidden shadow-xl">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a2a40] bg-[#0d1424]">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-2.5 h-2.5 rounded-full ${connected ? 'bg-[#22c55e] animate-pulse' : 'bg-[#ef4444]'}`} />
+          <div>
+            <div className="text-xs font-bold text-[#e2eaf3] flex items-center gap-2">
+              <span>LIVE CAMERA STREAM — {activeId}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded font-mono bg-[#3b82f615] text-[#60a5fa] border border-[#3b82f630]">
+                AICITY DATASET FEED
+              </span>
+            </div>
+            <div className="text-[10px] text-[#4d607a]">
+              {currentCam?.name || 'Surveillance Feed'} • Zone: {currentCam?.zone || 'Zone A'}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Quick switcher */}
+          <div className="hidden sm:flex items-center gap-1 bg-[#141c2e] p-1 rounded-md border border-[#1e2d45]">
+            {quickCams.map(c => (
+              <button
+                key={c.id}
+                onClick={() => onSelectCamera(c.id)}
+                className={`text-[9px] font-mono px-2 py-0.5 rounded transition-all ${
+                  (c.id === activeId)
+                    ? 'bg-[#3b82f6] text-white font-bold'
+                    : 'text-[#8899b4] hover:text-white hover:bg-[#1e2d45]'
+                }`}
+              >
+                {c.id.replace('CAM-', 'C')}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => onOpenDetail(activeId)}
+            className="text-[11px] px-2.5 py-1 rounded bg-[#3b82f615] text-[#60a5fa] border border-[#3b82f630] hover:bg-[#3b82f630] transition-colors flex items-center gap-1"
+          >
+            <span>Expand</span>
+            <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
+              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 01-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293-2.293a1 1 0 11-1.414 1.414L13.586 5H12zm-9 7a1 1 0 012 0v1.586l2.293-2.293a1 1 0 011.414 1.414L6.414 15H8a1 1 0 010 2H4a1 1 0 01-1-1v-4zm13-1a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 010-2h1.586l-2.293-2.293a1 1 0 011.414-1.414L15 13.586V12a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Video Viewport */}
+      <div className="relative bg-[#080d18] flex items-center justify-center overflow-hidden" style={{ aspectRatio: '16/9', maxHeight: '380px' }}>
+        {frameUrl ? (
+          <img
+            src={frameUrl}
+            alt={`Live stream ${activeId}`}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 bg-[#0c1220]">
+            <div className="w-8 h-8 rounded-full border-2 border-t-[#3b82f6] border-r-transparent border-b-[#3b82f6] border-l-transparent animate-spin mb-3" />
+            <div className="text-xs font-mono text-[#8899b4]">CONNECTING TO LIVE AICITY SURVEILLANCE FEED...</div>
+            <div className="text-[10px] text-[#4d607a] mt-1">{activeId} • WebSocket @ 8000</div>
+          </div>
+        )}
+
+        {/* Scanline */}
+        <div className="absolute inset-0 pointer-events-none opacity-15 overflow-hidden">
+          <div
+            style={{
+              width: '100%',
+              height: '2px',
+              background: 'rgba(59,130,246,0.6)',
+              animation: 'scan-line 4s linear infinite',
+              position: 'absolute',
+              top: 0,
+            }}
+          />
+        </div>
+
+        {/* HUD Badges */}
+        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#070c17]/80 backdrop-blur-sm border border-[#1a2a40] text-[10px] font-mono font-bold">
+          <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-[#22c55e] animate-pulse' : 'bg-[#ef4444]'}`} />
+          <span className={connected ? 'text-[#4ade80]' : 'text-[#f87171]'}>{connected ? 'LIVE FEED' : 'CONNECTING'}</span>
+        </div>
+
+        <div className="absolute top-3 right-3 px-2 py-1 rounded bg-[#070c17]/80 backdrop-blur-sm border border-[#1a2a40] text-[10px] font-mono text-right">
+          <div className="text-[#4d607a] text-[8px]">REID / DETECTIONS</div>
+          <div className="text-[#06b6d4] font-bold">{metadata?.detections?.length || currentCam?.vehicles || 0} ACTIVE</div>
+        </div>
+
+        <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded bg-[#070c17]/80 backdrop-blur-sm border border-[#1a2a40] text-[9px] font-mono text-[#8899b4]">
+          {timestamp || new Date().toLocaleTimeString()} IST • 10.0 FPS • AICity Track 1
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ΓöÇΓöÇ Alerts Panel ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function AlertsPanel({ alerts }: { alerts: Alert[] }) {
   const sevClass = (s: string) =>
     s === 'critical' ? 'severity-critical' :
-    s === 'warning' ? 'severity-warning' : 'severity-info';
+    s === 'warning' ? 'severity-warning' :
+    s === 'high' ? 'severity-warning' : 'severity-info';
   const sevColor = (s: string) =>
-    s === 'critical' ? '#f87171' : s === 'warning' ? '#fbbf24' : '#60a5fa';
+    s === 'critical' ? '#f87171' : (s === 'warning' || s === 'high') ? '#fbbf24' : '#60a5fa';
 
   const formatTime = (ts: string) => {
     return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -420,12 +538,20 @@ export default function Dashboard({ onCameraSelect }: { onCameraSelect: (id: str
           {kpis.map(k => <KPICard key={k.title} {...k} />)}
         </div>
 
-        {/* Map + Alerts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ minHeight: 340 }}>
-          <div className="lg:col-span-2">
+        {/* Live Camera Stream & GIS Map + Alerts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 space-y-4">
+            <DashboardLiveFeed
+              cameraId={selectedCam || cameras[0]?.id || 'CAM-001'}
+              cameras={cameras}
+              onSelectCamera={handleCamSelect}
+              onOpenDetail={handleCamSelect}
+            />
             <CityMap cameras={cameras} onSelectCamera={handleCamSelect} selectedCam={selectedCam} />
           </div>
-          <AlertsPanel alerts={recentAlerts} />
+          <div className="lg:col-span-1">
+            <AlertsPanel alerts={recentAlerts} />
+          </div>
         </div>
 
         {/* Charts row */}

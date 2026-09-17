@@ -1,18 +1,18 @@
 // UrbanTrax AI — Sample data (replace with FastAPI WebSocket feed)
 
 export const cameras = [
-  { id: 'CAM-001', name: 'MG Road Junction', location: 'MG Road, Zone A', lat: 52, lng: 38, status: 'online', fps: 30, traffic: 'high', vehicles: 47, mapX: 38, mapY: 28 },
-  { id: 'CAM-002', name: 'Yeshwanthpur Junction', location: 'Yeshwanthpur, Zone B', lat: 48, lng: 44, status: 'online', fps: 24, traffic: 'moderate', vehicles: 29, mapX: 52, mapY: 22 },
-  { id: 'CAM-003', name: 'Hebbal Flyover', location: 'Hebbal, Zone A', lat: 55, lng: 32, status: 'online', fps: 24, traffic: 'high', vehicles: 37, mapX: 28, mapY: 18 },
-  { id: 'CAM-004', name: 'Airport Road', location: 'Airport Rd, Zone C', lat: 60, lng: 50, status: 'online', fps: 25, traffic: 'moderate', vehicles: 22, mapX: 64, mapY: 12 },
-  { id: 'CAM-005', name: 'Electronic City Toll', location: 'Electronic City, Zone D', lat: 44, lng: 60, status: 'warning', fps: 18, traffic: 'low', vehicles: 11, mapX: 72, mapY: 60 },
-  { id: 'CAM-006', name: 'Silk Board Junction', location: 'Silk Board, Zone D', lat: 42, lng: 56, status: 'online', fps: 30, traffic: 'high', vehicles: 53, mapX: 60, mapY: 52 },
-  { id: 'CAM-007', name: 'Koramangala 5th Block', location: 'Koramangala, Zone C', lat: 46, lng: 48, status: 'online', fps: 30, traffic: 'moderate', vehicles: 31, mapX: 56, mapY: 42 },
-  { id: 'CAM-008', name: 'Whitefield Main Road', location: 'Whitefield, Zone E', lat: 58, lng: 42, status: 'online', fps: 25, traffic: 'low', vehicles: 14, mapX: 78, mapY: 36 },
-  { id: 'CAM-009', name: 'Bannerghatta Road', location: 'Bannerghatta, Zone D', lat: 40, lng: 52, status: 'offline', fps: 0, traffic: 'clear', vehicles: 0, mapX: 48, mapY: 68 },
-  { id: 'CAM-010', name: 'KR Circle', location: 'KR Circle, Zone A', lat: 50, lng: 40, status: 'online', fps: 24, traffic: 'moderate', vehicles: 26, mapX: 44, mapY: 38 },
-  { id: 'CAM-011', name: 'Indiranagar 100ft Road', location: 'Indiranagar, Zone B', lat: 54, lng: 46, status: 'online', fps: 30, traffic: 'high', vehicles: 41, mapX: 62, mapY: 30 },
-  { id: 'CAM-012', name: 'Marathahalli Bridge', location: 'Marathahalli, Zone E', lat: 56, lng: 54, status: 'warning', fps: 22, traffic: 'moderate', vehicles: 19, mapX: 74, mapY: 44 },
+  { id: 'CAM-001', name: 'MG Road Junction', location: 'MG Road, Zone A', lat: 12.9716, lng: 77.5946, status: 'online', fps: 30, traffic: 'high', vehicles: 47 },
+  { id: 'CAM-002', name: 'Yeshwanthpur Junction', location: 'Yeshwanthpur, Zone B', lat: 13.0220, lng: 77.5513, status: 'online', fps: 24, traffic: 'moderate', vehicles: 29 },
+  { id: 'CAM-003', name: 'Hebbal Flyover', location: 'Hebbal, Zone A', lat: 13.0358, lng: 77.5970, status: 'online', fps: 24, traffic: 'high', vehicles: 37 },
+  { id: 'CAM-004', name: 'KR Puram Signal', location: 'KR Puram, Zone C', lat: 13.0012, lng: 77.6964, status: 'online', fps: 25, traffic: 'moderate', vehicles: 22 },
+  { id: 'CAM-005', name: 'Electronic City Toll', location: 'Electronic City, Zone D', lat: 12.8399, lng: 77.6770, status: 'warning', fps: 18, traffic: 'low', vehicles: 11 },
+  { id: 'CAM-006', name: 'Silk Board Junction', location: 'Silk Board, Zone D', lat: 12.9170, lng: 77.6227, status: 'online', fps: 30, traffic: 'high', vehicles: 53 },
+  { id: 'CAM-007', name: 'Koramangala Signal', location: 'Koramangala, Zone C', lat: 12.9352, lng: 77.6245, status: 'online', fps: 30, traffic: 'moderate', vehicles: 31 },
+  { id: 'CAM-008', name: 'Whitefield Main Road', location: 'Whitefield, Zone E', lat: 12.9698, lng: 77.7500, status: 'online', fps: 25, traffic: 'low', vehicles: 14 },
+  { id: 'CAM-009', name: 'Bannerghatta Road Signal', location: 'Bannerghatta, Zone D', lat: 12.8876, lng: 77.5974, status: 'offline', fps: 0, traffic: 'clear', vehicles: 0 },
+  { id: 'CAM-010', name: 'KR Circle', location: 'KR Circle, Zone A', lat: 12.9766, lng: 77.5713, status: 'online', fps: 24, traffic: 'moderate', vehicles: 26 },
+  { id: 'CAM-011', name: 'Indiranagar Signal', location: 'Indiranagar, Zone B', lat: 12.9784, lng: 77.6408, status: 'online', fps: 30, traffic: 'high', vehicles: 41 },
+  { id: 'CAM-012', name: 'Marathahalli Bridge', location: 'Marathahalli, Zone E', lat: 12.9591, lng: 77.6974, status: 'warning', fps: 22, traffic: 'moderate', vehicles: 19 },
 ];
 
 export const kpiData = {

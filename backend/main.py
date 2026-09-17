@@ -885,45 +885,120 @@ def generate_synthetic_frame(camera_id: str, frame_num: int):
 async def websocket_camera_feed(websocket: WebSocket, camera_id: str):
     await handle_camera_stream(websocket, camera_id)
 
+AICITY_ZIP_PATH = "/Users/pashanth/Downloads/AICity22_Track1_MTMC_Tracking.zip"
+
+def get_aicity_dataset_dir(root_dir: str) -> str:
+    return os.path.join(root_dir, "data", "vehicle_reid_dataset")
+
 CAMERA_FOOTAGE_MAP = {
-    "CAM-001": "traffic_highway.mp4",
-    "CAM_01": "traffic_highway.mp4",
-    "CAM-002": "sample_traffic.mp4",
-    "CAM_02": "sample_traffic.mp4",
-    "CAM-003": "traffic_highway.mp4",
-    "CAM_03": "traffic_highway.mp4",
-    "CAM-004": "traffic_multi.mp4",
-    "CAM_04": "traffic_multi.mp4",
-    "CAM-005": "sample_traffic.mp4",
-    "CAM_05": "sample_traffic.mp4",
-    "CAM-006": "traffic_highway.mp4",
-    "CAM_06": "traffic_highway.mp4",
-    "CAM-007": "sample_traffic.mp4",
-    "CAM_07": "sample_traffic.mp4",
-    "CAM-008": "traffic_highway.mp4",
-    "CAM_08": "traffic_highway.mp4",
-    "CAM-010": "sample_traffic.mp4",
-    "CAM_10": "sample_traffic.mp4",
-    "CAM-011": "traffic_highway.mp4",
-    "CAM_11": "traffic_highway.mp4",
-    "CAM-012": "traffic_multi.mp4",
-    "CAM_12": "traffic_multi.mp4",
+    # Sequence S01 (Intersection - Cameras 1-5)
+    "CAM-001": os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c001", "vdo.avi"),
+    "CAM_01":  os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c001", "vdo.avi"),
+    "c001":    os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c001", "vdo.avi"),
+
+    "CAM-002": os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c002", "vdo.avi"),
+    "CAM_02":  os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c002", "vdo.avi"),
+    "c002":    os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c002", "vdo.avi"),
+
+    "CAM-003": os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c003", "vdo.avi"),
+    "CAM_03":  os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c003", "vdo.avi"),
+    "c003":    os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c003", "vdo.avi"),
+
+    "CAM-004": os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c004", "vdo.avi"),
+    "CAM_04":  os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c004", "vdo.avi"),
+    "c004":    os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c004", "vdo.avi"),
+
+    "CAM-005": os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c005", "vdo.avi"),
+    "CAM_05":  os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c005", "vdo.avi"),
+    "c005":    os.path.join("data", "vehicle_reid_dataset", "train", "S01", "c005", "vdo.avi"),
+
+    # Sequence S02 (Cameras 6-9)
+    "CAM-006": os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c006", "vdo.avi"),
+    "CAM_06":  os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c006", "vdo.avi"),
+    "c006":    os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c006", "vdo.avi"),
+
+    "CAM-007": os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c007", "vdo.avi"),
+    "CAM_07":  os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c007", "vdo.avi"),
+    "c007":    os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c007", "vdo.avi"),
+
+    "CAM-008": os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c008", "vdo.avi"),
+    "CAM_08":  os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c008", "vdo.avi"),
+    "c008":    os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c008", "vdo.avi"),
+
+    "CAM-009": os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c009", "vdo.avi"),
+    "CAM_09":  os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c009", "vdo.avi"),
+    "c009":    os.path.join("data", "vehicle_reid_dataset", "validation", "S02", "c009", "vdo.avi"),
+
+    # Sequence S03 (Cameras 10-12)
+    "CAM-010": os.path.join("data", "vehicle_reid_dataset", "train", "S03", "c010", "vdo.avi"),
+    "CAM_10":  os.path.join("data", "vehicle_reid_dataset", "train", "S03", "c010", "vdo.avi"),
+    "c010":    os.path.join("data", "vehicle_reid_dataset", "train", "S03", "c010", "vdo.avi"),
+
+    "CAM-011": os.path.join("data", "vehicle_reid_dataset", "train", "S03", "c011", "vdo.avi"),
+    "CAM_11":  os.path.join("data", "vehicle_reid_dataset", "train", "S03", "c011", "vdo.avi"),
+    "c011":    os.path.join("data", "vehicle_reid_dataset", "train", "S03", "c011", "vdo.avi"),
+
+    "CAM-012": os.path.join("data", "vehicle_reid_dataset", "train", "S03", "c012", "vdo.avi"),
+    "CAM_12":  os.path.join("data", "vehicle_reid_dataset", "train", "S03", "c012", "vdo.avi"),
+    "c012":    os.path.join("data", "vehicle_reid_dataset", "train", "S03", "c012", "vdo.avi"),
 }
+
+def resolve_camera_footage(camera_id: str, root_dir: str) -> str:
+    """Finds the AICity MTMC dataset video path for a given camera ID, checking local files and the source zip."""
+    # 1. Direct map lookup
+    if camera_id in CAMERA_FOOTAGE_MAP:
+        rel_path = CAMERA_FOOTAGE_MAP[camera_id]
+        full_path = os.path.join(root_dir, rel_path) if not os.path.isabs(rel_path) else rel_path
+        if os.path.exists(full_path):
+            return full_path
+
+    # 2. Extract numeric camera index (e.g. CAM-003 -> 3 -> c003)
+    cam_digits = "".join(filter(str.isdigit, camera_id))
+    dataset_dir = get_aicity_dataset_dir(root_dir)
+    if cam_digits:
+        c_name = f"c{int(cam_digits):03d}"
+        for sub in ["train/S01", "validation/S02", "train/S03", "train/S04", "validation/S05", "test/S06"]:
+            candidate = os.path.join(dataset_dir, sub, c_name, "vdo.avi")
+            if os.path.exists(candidate):
+                return candidate
+
+    # 3. If missing from extracted dataset but zip exists, extract target camera on-demand
+    if os.path.exists(AICITY_ZIP_PATH) and cam_digits:
+        import zipfile
+        c_name = f"c{int(cam_digits):03d}"
+        try:
+            with zipfile.ZipFile(AICITY_ZIP_PATH, 'r') as z:
+                target_entries = [f for f in z.namelist() if f.endswith(f"{c_name}/vdo.avi")]
+                if target_entries:
+                    z.extract(target_entries[0], dataset_dir)
+                    extracted_path = os.path.join(dataset_dir, target_entries[0])
+                    if os.path.exists(extracted_path):
+                        return extracted_path
+        except Exception as e:
+            print(f"[Footage] Error extracting from zip: {e}")
+
+    # 4. Fallback to default S01/c001
+    default_dataset_vdo = os.path.join(dataset_dir, "train", "S01", "c001", "vdo.avi")
+    if os.path.exists(default_dataset_vdo):
+        return default_dataset_vdo
+
+    return os.path.join(root_dir, "sample_traffic.mp4")
 
 async def handle_camera_stream(websocket: WebSocket, camera_id: str):
     await websocket.accept()
     pipeline = pipelines.get(camera_id, SurveillancePipeline(camera_id=camera_id, reid_engine=shared_reid_engine) if ML_AVAILABLE else None)
     
-    # Pick distinct traffic footage file based on camera ID
+    # Pick distinct AICity dataset traffic footage based on camera ID
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    footage_filename = CAMERA_FOOTAGE_MAP.get(camera_id, "sample_traffic.mp4")
-    video_path = os.path.join(root_dir, footage_filename)
+    video_path = resolve_camera_footage(camera_id, root_dir)
+    print(f"[WS] Streaming AICity footage for {camera_id} from {video_path}")
     
     cap = None
     if os.path.exists(video_path):
         cap = cv2.VideoCapture(video_path)
-        # Offset start frame dynamically per camera ID so videos don't synchronize
-        offset = (abs(hash(camera_id)) * 43) % 250
+        # Stagger start frame dynamically per camera ID so videos don't synchronize
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 2000)
+        offset = (abs(hash(camera_id)) * 73) % max(1, total_frames - 200)
         cap.set(cv2.CAP_PROP_POS_FRAMES, offset)
     elif camera_id == "CAM_01":
         cap = cv2.VideoCapture(0)
@@ -997,7 +1072,7 @@ async def handle_camera_stream(websocket: WebSocket, camera_id: str):
             }
 
             await websocket.send_text(json.dumps(payload))
-            await asyncio.sleep(0.04) # ~25 FPS smooth stream
+            await asyncio.sleep(0.08) # ~12.5 FPS smooth dataset stream
     except WebSocketDisconnect:
         print(f"[WS] Client disconnected from {camera_id}")
     finally:

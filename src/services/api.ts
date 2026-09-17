@@ -3,7 +3,7 @@
  * Includes seamless fallback datasets for Vercel static deployments.
  */
 
-const API_BASE = (import.meta.env.VITE_API_URL as string) || '';
+const API_BASE = (import.meta.env.VITE_API_URL as string) || (typeof window !== 'undefined' && window.location.port !== '8000' ? `http://${window.location.hostname || 'localhost'}:8000` : '');
 
 // ─────────────────────────── Mock Fallback Data ───────────────────────────
 

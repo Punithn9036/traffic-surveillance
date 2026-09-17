@@ -9,9 +9,11 @@ const WS_BASE = (() => {
   if (apiUrl) {
     return apiUrl.replace(/^http/, 'ws');
   }
-  // same origin
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${window.location.host}`;
+  const host = typeof window !== 'undefined' && window.location.port !== '8000'
+    ? `${window.location.hostname || 'localhost'}:8000`
+    : window.location.host;
+  return `${proto}//${host}`;
 })();
 
 export interface CameraMetadata {
