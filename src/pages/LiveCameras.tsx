@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { useCameraFeed } from '../services/websocket';
 import CameraDetail from './CameraDetail';
 
 type ViewMode = 'grid' | 'list';
@@ -87,38 +88,8 @@ function CameraCard({ cam, onSelect, showOverlays }: {
   onSelect: () => void;
   showOverlays: boolean;
 }) {
-  const [liveFrame, setLiveFrame] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (cam.status === 'offline') return;
-    let ws: WebSocket | null = null;
-    let isMounted = true;
-
-    try {
-      ws = new WebSocket(`ws://localhost:8000/ws/camera/${cam.id}`);
-      ws.onmessage = (event) => {
-        if (!isMounted) return;
-        try {
-          const data = JSON.parse(event.data);
-          if (data && data.frame) {
-            setLiveFrame(data.frame);
-          }
-        } catch (err) {
-          // ignore parsing glitch
-        }
-      };
-      ws.onerror = () => {
-        // fallback gracefully
-      };
-    } catch (e) {
-      // ignore
-    }
-
-    return () => {
-      isMounted = false;
-      if (ws) ws.close();
-    };
-  }, [cam.id, cam.status]);
+  const isOffline = cam.status === 'offline';
+  const { frameUrl: liveFrame } = useCameraFeed(cam.id, !isOffline);
 
   const statusConfig: Record<string, { label: string; dotClass: string; textClass: string; borderClass: string }> = {
     online: { label: 'LIVE', dotClass: 'bg-[#22c55e] animate-pulse-green', textClass: 'text-[#4ade80]', borderClass: 'border-[#1a2a40]' },
@@ -133,7 +104,6 @@ function CameraCard({ cam, onSelect, showOverlays }: {
   };
 
   const annotations = cameraAnnotations[cam.id] || [];
-  const isOffline = cam.status === 'offline';
 
   return (
     <div

@@ -3,7 +3,7 @@
  * Includes seamless fallback datasets for Vercel static deployments.
  */
 
-const API_BASE = (import.meta.env.VITE_API_URL as string) || (typeof window !== 'undefined' && window.location.port !== '8000' ? `http://${window.location.hostname || 'localhost'}:8000` : '');
+const API_BASE = (import.meta.env.VITE_API_URL as string) || '';
 
 // ─────────────────────────── Mock Fallback Data ───────────────────────────
 
@@ -73,22 +73,44 @@ const MOCK_SYSTEM_HEALTH: SystemHealth = {
 };
 
 async function apiFetch<T>(path: string, options?: RequestInit, fallback?: T): Promise<T> {
-  const url = `${API_BASE}${path}`;
-  try {
-    const res = await fetch(url, {
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
-      ...options,
-    });
-    if (!res.ok) {
-      if (fallback !== undefined) return fallback;
-      const error = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new Error(error.detail || `API error ${res.status}`);
-    }
-    return res.json();
-  } catch (err) {
-    if (fallback !== undefined) return fallback;
-    throw err;
+  const envUrl = (import.meta.env.VITE_API_URL as string) || '';
+  const candidates: string[] = [];
+
+  if (envUrl) {
+    candidates.push(`${envUrl}${path}`);
   }
+
+  // 1. Direct port 8000 on current hostname (fastest, avoids sandboxed proxy bottlenecks)
+  if (typeof window !== 'undefined' && window.location.port !== '8000') {
+    const hostname = window.location.hostname || 'localhost';
+    candidates.push(`http://${hostname}:8000${path}`);
+  }
+
+  // 2. Relative path (proxied by web server or reverse proxy)
+  candidates.push(path);
+
+  // 3. Localhost explicit fallback
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    candidates.push(`http://127.0.0.1:8000${path}`);
+  }
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...options?.headers },
+        ...options,
+      });
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        return await res.json();
+      }
+    } catch {
+      // Try next candidate
+    }
+  }
+
+  if (fallback !== undefined) return fallback;
+  throw new Error(`Failed to fetch ${path}`);
 }
 
 // ─────────────────────────── Types ────────────────────────────────────────

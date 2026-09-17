@@ -1,20 +1,48 @@
 /**
- * websocket.ts — React hook for live camera WebSocket feeds
+ * websocket.ts — Multi-device resilient React hook for live camera WebSocket feeds
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const WS_BASE = (() => {
-  const apiUrl = (import.meta.env.VITE_API_URL as string) || '';
-  if (apiUrl) {
-    return apiUrl.replace(/^http/, 'ws');
-  }
+let workingWsBase: string | null = null;
+
+export function getWsCandidates(cameraId: string): string[] {
+  if (typeof window === 'undefined') return [];
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = typeof window !== 'undefined' && window.location.port !== '8000'
-    ? `${window.location.hostname || 'localhost'}:8000`
-    : window.location.host;
-  return `${proto}//${host}`;
-})();
+  const candidates: string[] = [];
+
+  const envUrl = (import.meta.env.VITE_API_URL as string) || '';
+  if (envUrl) {
+    candidates.push(`${envUrl.replace(/^http/, 'ws')}/ws/camera/${cameraId}`);
+  }
+
+  // If a working base was previously discovered, prioritize it
+  if (workingWsBase) {
+    candidates.push(`${workingWsBase}/ws/camera/${cameraId}`);
+  }
+
+  // 1. Same-origin (Vite dev/preview server proxy or production reverse proxy)
+  candidates.push(`${proto}//${window.location.host}/ws/camera/${cameraId}`);
+
+  // 2. Direct backend on port 8000 using current hostname (for LAN devices or localhost)
+  if (window.location.port !== '8000') {
+    const hostname = window.location.hostname || 'localhost';
+    candidates.push(`${proto}//${hostname}:8000/ws/camera/${cameraId}`);
+  }
+
+  // 3. 127.0.0.1 direct fallback
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    candidates.push(`ws://127.0.0.1:8000/ws/camera/${cameraId}`);
+  }
+
+  // Return unique candidates preserving order
+  return Array.from(new Set(candidates));
+}
+
+export function getWebSocketUrl(cameraId: string): string {
+  const candidates = getWsCandidates(cameraId);
+  return candidates[0] || `ws://localhost:8000/ws/camera/${cameraId}`;
+}
 
 export interface CameraMetadata {
   alerts: Array<{ type: string; plate_text?: string; camera_id?: string; timestamp?: string }>;
@@ -41,48 +69,69 @@ export function useCameraFeed(cameraId: string | null, enabled = true): CameraFe
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const candidateIndexRef = useRef(0);
   const mountedRef = useRef(true);
 
   const connect = useCallback(() => {
     if (!cameraId || !enabled || !mountedRef.current) return;
 
-    const url = `${WS_BASE}/ws/camera/${cameraId}`;
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
+    const candidates = getWsCandidates(cameraId);
+    if (candidates.length === 0) return;
 
-    ws.onopen = () => {
-      if (!mountedRef.current) return;
-      setState(prev => ({ ...prev, connected: true, error: null }));
-    };
+    const candidateIdx = candidateIndexRef.current % candidates.length;
+    const url = candidates[candidateIdx];
 
-    ws.onmessage = (event) => {
-      if (!mountedRef.current) return;
-      try {
-        const data = JSON.parse(event.data);
-        setState(prev => ({
-          ...prev,
-          frameUrl: data.frame || prev.frameUrl,
-          metadata: data.metadata || prev.metadata,
-          timestamp: data.timestamp || null,
-        }));
-      } catch {
-        // ignore parse errors
+    try {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
       }
-    };
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
 
-    ws.onerror = () => {
-      if (!mountedRef.current) return;
-      setState(prev => ({ ...prev, connected: false, error: 'Connection error' }));
-    };
+      ws.onopen = () => {
+        if (!mountedRef.current) return;
+        // Save the successful base URL for all future connections
+        const match = url.match(/^(wss?:\/\/[^/]+)/);
+        if (match) {
+          workingWsBase = match[1];
+        }
+        setState(prev => ({ ...prev, connected: true, error: null }));
+      };
 
-    ws.onclose = () => {
-      if (!mountedRef.current) return;
-      setState(prev => ({ ...prev, connected: false, frameUrl: null }));
-      // Reconnect after 3 seconds
-      reconnectRef.current = setTimeout(() => {
-        if (mountedRef.current) connect();
-      }, 3000);
-    };
+      ws.onmessage = (event) => {
+        if (!mountedRef.current) return;
+        try {
+          const data = JSON.parse(event.data);
+          setState(prev => ({
+            ...prev,
+            frameUrl: data.frame || prev.frameUrl,
+            metadata: data.metadata || prev.metadata,
+            timestamp: data.timestamp || null,
+          }));
+        } catch {
+          // ignore parse errors
+        }
+      };
+
+      ws.onerror = () => {
+        if (!mountedRef.current) return;
+        // Try next candidate URL on error
+        candidateIndexRef.current += 1;
+        setState(prev => ({ ...prev, connected: false, error: 'Connection error' }));
+      };
+
+      ws.onclose = () => {
+        if (!mountedRef.current) return;
+        setState(prev => ({ ...prev, connected: false }));
+        // Reconnect after 2 seconds
+        reconnectRef.current = setTimeout(() => {
+          if (mountedRef.current && enabled) connect();
+        }, 2000);
+      };
+    } catch (err) {
+      candidateIndexRef.current += 1;
+    }
   }, [cameraId, enabled]);
 
   useEffect(() => {
