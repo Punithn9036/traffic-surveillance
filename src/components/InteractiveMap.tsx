@@ -44,12 +44,18 @@ interface Props {
 }
 
 const DEFAULT_CAMERAS: MapCamera[] = [
-  { id: 'CAM_01', name: 'MG Road Junction', lat: 12.9716, lng: 77.5946, status: 'active', vehicleCount: 42, speedLimit: 60 },
-  { id: 'CAM_02', name: 'Silk Board Flyover', lat: 12.9172, lng: 77.6228, status: 'warning', vehicleCount: 88, speedLimit: 50 },
-  { id: 'CAM_03', name: 'Indiranagar 100ft Rd', lat: 12.9784, lng: 77.6408, status: 'active', vehicleCount: 31, speedLimit: 50 },
-  { id: 'CAM_04', name: 'Hebbal Flyover', lat: 13.0358, lng: 77.5970, status: 'active', vehicleCount: 65, speedLimit: 70 },
-  { id: 'CAM_05', name: 'Electronic City Toll', lat: 12.8452, lng: 77.6602, status: 'active', vehicleCount: 54, speedLimit: 80 },
-  { id: 'CAM_06', name: 'Whitefield Main Rd', lat: 12.9698, lng: 77.7499, status: 'active', vehicleCount: 29, speedLimit: 50 },
+  { id: 'CAM-001', name: 'MG Road Junction', lat: 12.9716, lng: 77.5946, status: 'active', vehicleCount: 47, speedLimit: 60 },
+  { id: 'CAM-002', name: 'Yeshwanthpur Junction', lat: 13.0220, lng: 77.5513, status: 'active', vehicleCount: 29, speedLimit: 50 },
+  { id: 'CAM-003', name: 'Hebbal Flyover', lat: 13.0358, lng: 77.5970, status: 'warning', vehicleCount: 37, speedLimit: 70 },
+  { id: 'CAM-004', name: 'KR Puram Signal', lat: 13.0012, lng: 77.6964, status: 'active', vehicleCount: 22, speedLimit: 60 },
+  { id: 'CAM-005', name: 'Electronic City Toll', lat: 12.8399, lng: 77.6770, status: 'active', vehicleCount: 11, speedLimit: 80 },
+  { id: 'CAM-006', name: 'Silk Board Junction', lat: 12.9170, lng: 77.6227, status: 'warning', vehicleCount: 53, speedLimit: 50 },
+  { id: 'CAM-007', name: 'Koramangala Signal', lat: 12.9352, lng: 77.6245, status: 'active', vehicleCount: 31, speedLimit: 50 },
+  { id: 'CAM-008', name: 'Whitefield Main Road', lat: 12.9698, lng: 77.7500, status: 'active', vehicleCount: 14, speedLimit: 50 },
+  { id: 'CAM-009', name: 'Bannerghatta Road Signal', lat: 12.8876, lng: 77.5974, status: 'offline', vehicleCount: 0, speedLimit: 60 },
+  { id: 'CAM-010', name: 'KR Circle', lat: 12.9766, lng: 77.5713, status: 'active', vehicleCount: 26, speedLimit: 50 },
+  { id: 'CAM-011', name: 'Indiranagar Signal', lat: 12.9784, lng: 77.6408, status: 'active', vehicleCount: 41, speedLimit: 50 },
+  { id: 'CAM-012', name: 'Marathahalli Bridge', lat: 12.9591, lng: 77.6974, status: 'warning', vehicleCount: 19, speedLimit: 60 },
 ]
 
 export default function InteractiveMap({
@@ -58,7 +64,7 @@ export default function InteractiveMap({
   selectedCameraId,
   onSelectCamera,
   center = [12.9716, 77.5946],
-  zoom = 12,
+  zoom = 13,
   height = '360px',
 }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -69,9 +75,9 @@ export default function InteractiveMap({
   const [hasError, setHasError] = useState(false)
 
   const TILE_URLS = {
-    dark: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    street: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    street: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
   }
 
   // Safe Leaflet Initialization
@@ -96,7 +102,8 @@ export default function InteractiveMap({
 
       const initialTileLayer = L.tileLayer(TILE_URLS.dark, {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors &copy; Esri',
+        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
       }).addTo(map)
 
       ;(map as any)._customTileLayer = initialTileLayer
@@ -138,7 +145,8 @@ export default function InteractiveMap({
 
       const newTileLayer = L.tileLayer(TILE_URLS[tileLayerType], {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap &copy; Esri',
+        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
       }).addTo(map)
 
       ;(map as any)._customTileLayer = newTileLayer
